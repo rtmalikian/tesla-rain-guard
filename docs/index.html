@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tesla Rain Guard — Live Demo (POC)</title>
+<meta name="description" content="Tesla Rain Guard: closes your Tesla's windows before rain hits, vents them on hot dry days. Interactive proof-of-concept demo of the free open-source tesla-rain-guard app.">
+<style>
+  :root { --bg:#0b0e13; --panel:#141922; --line:#232c3a; --text:#e8edf4; --muted:#93a1b5; --red:#e82127; --green:#37d67a; --blue:#4da3ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width:860px; margin:0 auto; padding:24px 16px 64px; }
+  header { text-align:center; padding:28px 0 8px; }
+  h1 { font-size:2rem; margin:0 0 8px; }
+  h1 .red { color:var(--red); }
+  .sub { color:var(--muted); max-width:640px; margin:0 auto; line-height:1.55; }
+  .badge { display:inline-block; margin-top:14px; padding:4px 12px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:.82rem; }
+  .badge b { color:var(--green); }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; margin-top:18px; }
+  .panel h2 { margin:0 0 10px; font-size:1rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+  .cars { display:flex; gap:12px; flex-wrap:wrap; }
+  .car { flex:1 1 220px; background:#0d1117; border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .car h3 { margin:0 0 6px; font-size:1.05rem; }
+  .kv { color:var(--muted); font-size:.9rem; line-height:1.7; }
+  .kv b { color:var(--text); font-weight:600; }
+  .windows { font-size:2rem; }
+  .scenarios { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { border:1px solid var(--line); background:transparent; color:var(--text); border-radius:999px; padding:8px 14px; cursor:pointer; font-size:.92rem; }
+  .chip:hover { border-color:var(--red); }
+  .chip.active { border-color:var(--blue); color:var(--blue); }
+  .log { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.86rem; line-height:1.7; max-height:260px; overflow:auto; }
+  .log .act { color:var(--green); font-weight:600; }
+  .log .skip { color:var(--muted); }
+  .log .time { color:var(--blue); }
+  .chat { background:#0d1117; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .msgs { padding:14px; min-height:160px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:85%; padding:10px 14px; border-radius:12px; line-height:1.5; font-size:.95rem; white-space:pre-wrap; }
+  .msg.user { align-self:flex-end; background:#1d2a3d; }
+  .msg.bot { align-self:flex-start; background:var(--panel); border:1px solid var(--line); }
+  form { display:flex; gap:8px; padding:12px 14px 14px; border-top:1px solid var(--line); }
+  input[type=text] { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:11px 12px; font-size:1rem; }
+  button.send { background:var(--red); border:none; color:#fff; border-radius:10px; padding:0 18px; font-size:1rem; cursor:pointer; }
+  .note { color:var(--muted); font-size:.86rem; text-align:center; margin-top:12px; line-height:1.6; }
+  a { color:#6db3ff; }
+  code { background:#0d1117; padding:1px 6px; border-radius:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Tesla <span class="red">Rain Guard</span></h1>
+    <p class="sub">Closes your Tesla's windows <b>before</b> the rain hits — and cracks them on scorching
+    dry days. Pick a weather scenario below and watch the guard run the same decision logic the
+    real app uses, on a pretend parked car.</p>
+    <span class="badge">● DEMO DATA — no real cars or weather here · <a href="https://github.com/rtmalikian/tesla-rain-guard">Get the free app on GitHub</a></span>
+  </header>
+
+  <div class="panel">
+    <h2>1 · Your car</h2>
+    <div class="cars">
+      <div class="car">
+        <h3>🚗 Model Y <span class="kv">(demo)</span></h3>
+        <div class="windows" id="winEmoji">🪟</div>
+        <div class="kv">Windows: <b id="winState">cracked open</b><br>
+        Car: <b id="driveState">parked</b> · Cabin <b id="cabinT">26°C</b><br>
+        Location: <b>34.05, −118.24</b> (pretend)</div>
+      </div>
+      <div class="car">
+        <h3>🌦 Weather at the car <span class="kv">(demo)</span></h3>
+        <div class="kv">Sky: <b id="skyNow">sunny</b><br>
+        Forecast: <b id="forecastNow">rain ~60 min out (85%)</b><br>
+        Source: pretend feed, not Open-Meteo</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>2 · Pick a scenario — the guard runs a round</h2>
+    <div class="scenarios">
+      <button class="chip active" onclick="runScenario('storm', this)">⛈ Storm approaching, windows cracked</button>
+      <button class="chip" onclick="runScenario('raining', this)">🌧 Raining now, windows open</button>
+      <button class="chip" onclick="runScenario('hot', this)">🥵 Hot dry day, cabin 45°C</button>
+      <button class="chip" onclick="runScenario('driving', this)">🚙 Driving with windows open</button>
+      <button class="chip" onclick="runScenario('safe', this)">☀️ Already closed, clear skies</button>
+    </div>
+    <div style="margin-top:12px;">
+      <button class="chip" onclick="resetCar()">↺ Reset car (windows cracked)</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>3 · Decision log</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="panel">
+    <h2>4 · Ask the guard</h2>
+    <div class="chat">
+      <div class="msgs" id="msgs">
+        <div class="msg bot">Ask me why I did something — e.g. "why did you close the windows?" — or try "close the windows".</div>
+      </div>
+      <form onsubmit="submitForm(event)">
+        <input type="text" id="q" placeholder="why did you close the windows?" autocomplete="off">
+        <button class="send" type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <p class="note">The real app runs these same rules on a schedule against the official Tesla Fleet API —
+  no-wake reads, free Open-Meteo weather, <code>window_control</code> commands only on state change,
+  and a full decision log the chat endpoint explains itself from. LLM features (free-form Q&A)
+  plug into local Ollama or any OpenAI-compatible backend; the rules work with no AI at all.<br><br>
+  <a href="https://github.com/rtmalikian/tesla-rain-guard">github.com/rtmalikian/tesla-rain-guard</a> — MIT, free forever.
+  Setup takes minutes: <code>train setup</code> asks plain-language questions, no config editing.</p>
+</div>
+
+<script>
+// --- the guard's real decision logic, in the browser -----------------------
+const state = { windows: 'vented', driving: false, cabin: 26 };
+const decisions = [];
+let clock = new Date(); clock.setHours(10, 5, 0, 0);
+
+function fmtTime(d) { return d.toTimeString().slice(0, 5); }
+function advance(min) { clock = new Date(clock.getTime() + min * 60000); }
+
+function logLine(time, html, cls) {
+  const log = document.getElementById('log');
+  const d = document.createElement('div');
+  d.innerHTML = '<span class="time">[' + time + ']</span> ' + html;
+  if (cls) d.className = cls;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+
+function render() {
+  const em = { closed: '🔒', vented: '🪟', open: '🪟🪟' };
+  const words = { closed: 'closed', vented: 'cracked open', open: 'fully open' };
+  document.getElementById('winEmoji').textContent = em[state.windows];
+  document.getElementById('winState').textContent = words[state.windows];
+  document.getElementById('driveState').textContent = state.driving ? 'driving' : 'parked';
+  document.getElementById('cabinT').textContent = state.cabin + '°C';
+}
+
+function decide(scn) {
+  // mirrors guard.py: driving -> nothing; rain + not closed -> close;
+  // hot + closed + dry -> vent; else nothing.
+  if (scn === 'driving' || state.driving) {
+    return { action: 'nothing', why: "Car is driving — windows are the driver's business, not mine." };
+  }
+  if (scn === 'storm' || scn === 'raining') {
+    if (state.windows === 'closed')
+      return { action: 'nothing', why: 'Windows already closed; rain handled.' };
+    return { action: 'close_windows',
+             why: 'Windows are ' + (state.windows === 'vented' ? 'cracked' : 'open') + '; ' +
+                  (scn === 'raining' ? 'rain is falling now' : 'rain expected in ~60 min') +
+                  ' — closing before the cabin gets wet.' };
+  }
+  if (scn === 'hot') {
+    if (state.windows !== 'closed')
+      return { action: 'nothing', why: 'Windows are already cracked; nothing to gain.' };
+    return { action: 'vent_windows',
+             why: 'Cabin is ' + state.cabin + '°C and no rain expected for 3h — cracking the windows to let heat out.' };
+  }
+  return { action: 'nothing', why: 'No rain expected and the cabin is fine.' };
+}
+
+function runScenario(scn, btn) {
+  document.querySelectorAll('.scenarios .chip').forEach(c => c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  advance(7);
+  const t = fmtTime(clock);
+  const sky = { storm: 'sunny', raining: 'rain falling', hot: 'sunny, 38°C', driving: 'sunny', safe: 'clear' }[scn];
+  const fc  = { storm: 'rain ~60 min out (85%)', raining: 'rain now (code 61)', hot: 'no rain for 6h',
+                driving: 'no rain for 6h', safe: 'no rain for 6h' }[scn];
+  document.getElementById('skyNow').textContent = sky;
+  document.getElementById('forecastNow').textContent = fc;
+  if (scn === 'driving') { state.driving = true; state.windows = 'open'; }
+  if (scn === 'hot') { state.cabin = 45; state.driving = false; }
+  const d = decide(scn);
+  if (d.action === 'close_windows') { state.windows = 'closed'; state.driving = false; }
+  if (d.action === 'vent_windows') { state.windows = 'vented'; state.driving = false; }
+  render();
+  const act = d.action === 'nothing'
+    ? '<span class="skip">no action</span>'
+    : '<span class="act">' + (d.action === 'close_windows' ? 'CLOSED the windows' : 'CRACKED the windows') + '</span>';
+  logLine(t, 'Model Y: ' + act + ' — ' + d.why);
+  decisions.unshift({ time: t, action: d.action, why: d.why });
+}
+
+// --- Q&A mirrors qa.py ------------------------------------------------------
+const msgs = document.getElementById('msgs');
+function add(text, who) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + who; d.textContent = text; msgs.appendChild(d);
+  d.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+function answer(raw) {
+  const t = raw.toLowerCase();
+  if (t.includes('why') || t.includes('explain') || t.includes('what happened')) {
+    const hits = decisions.filter(d => d.action !== 'nothing');
+    if (!hits.length)
+      return 'I haven\u2019t closed or vented the windows in this demo yet — pick a scenario above and ask again.';
+    const last = hits[0];
+    const what = last.action === 'close_windows' ? 'I closed the windows' : 'I cracked the windows for heat';
+    return 'At ' + last.time + ' ' + what + ' on the Model Y. Reason: ' + last.why;
+  }
+  if (/close|shut/.test(t) && t.includes('window')) {
+    if (state.driving) return "The Model Y is driving — I won't touch its windows. Your call, driver.";
+    state.windows = 'closed'; render(); advance(1);
+    decisions.unshift({ time: fmtTime(clock), action: 'close_windows', why: 'you asked me to' });
+    return 'Ran close_windows on Model Y. (Demo — the real app sends window_control over the Tesla Fleet API.)';
+  }
+  if (/vent|crack/.test(t) && t.includes('window')) {
+    state.windows = 'vented'; render();
+    return 'Ran vent_windows on Model Y. (Demo)';
+  }
+  if (t.includes('window') || t.includes('status')) {
+    const w = { closed: 'closed', vented: 'cracked open', open: 'fully open' }[state.windows];
+    return 'Model Y: windows ' + w + ' (' + (state.driving ? 'driving' : 'parked') + '), inside ' + state.cabin + '°C.';
+  }
+  return 'Ask me why I did something ("why did you close the windows?"), check "status?", or tell me to "close the windows".';
+}
+function ask(text) { add(text, 'user'); setTimeout(() => add(answer(text), 'bot'), 250); }
+function submitForm(e) {
+  e.preventDefault();
+  const q = document.getElementById('q');
+  if (q.value.trim()) { ask(q.value.trim()); q.value = ''; }
+}
+function resetCar() {
+  state.windows = 'vented'; state.driving = false; state.cabin = 26; render();
+  logLine(fmtTime(clock), '<span class="skip">car reset: windows cracked, parked</span>');
+}
+
+logLine('10:00', '<span class="skip">demo started — try a scenario above</span>');
+render();
+</script>
+</body>
+</html>
